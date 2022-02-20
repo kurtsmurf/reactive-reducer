@@ -1,4 +1,4 @@
-// import { useReducer } from "preact/hooks";
+import { useReducer } from "preact/hooks";
 // @ts-ignore
 import deepequal from "https://cdn.skypack.dev/deepequal";
 
@@ -30,7 +30,7 @@ const reducer = (graph: Graph, event: Event): Graph => {
     .map((dep) => ({
       type: "Update",
       node: dep,
-      newValue: event.newValue || 0,
+      newValue: event.newValue,
     }));
 
   switch (target.type) {
@@ -94,7 +94,6 @@ const reducerTest = (
     expected: ${stringify(expected)}
 
     actual: ${stringify(actual)}
-
   `);
 };
 
@@ -215,30 +214,49 @@ for (const testCase of testCases) {
 // ********************************************************
 
 export function App() {
-  // const [state, dispatch] = useReducer(reducer, initialState);
+  const [state, dispatch] = useReducer(reducer, initialState);
 
-  // return (
-  //   <>
-  //     <label htmlFor="a">A</label>
-  //     <input
-  //       type="number"
-  //       name="a"
-  //       id="a"
-  //       value={state["a"].value}
-  //       onInput={(event) =>
-  //         dispatch({
-  //           node: "a",
-  //           newValue: parseInt(event.currentTarget.value),
-  //         })}
-  //     />
+  const a = state.find((el) => el.id === "a");
+  const b = state.find((el) => el.id === "b");
+  const aPlusB = state.find((el) => el.id === "aPlusB");
 
-  //     <label htmlFor="b">B</label>
-  //     <input type="number" name="b" id="b" />
+  if (!(a && b && aPlusB)) return <p>that ain't right</p>;
 
-  //     <label htmlFor="b">A + B</label>
-  //     <input type="number" name="aPlusB" id="aPlusB" readOnly />
-  //   </>
-  // );
+  return (
+    <>
+      <label htmlFor="a">A</label>
+      <input
+        type="number"
+        name="a"
+        id="a"
+        value={a.value}
+        onInput={(event) =>
+          dispatch({
+            node: "a",
+            newValue: parseInt(event.currentTarget.value),
+          })}
+      />
 
-  return <></>;
+      <label htmlFor="b">B</label>
+      <input
+        type="number"
+        name="b"
+        id="b"
+        value={b.value}
+        onInput={(event) =>
+          dispatch({
+            node: "b",
+            newValue: parseInt(event.currentTarget.value),
+          })}
+      />
+      <label htmlFor="aPlusB">A + B</label>
+      <input
+        readOnly
+        type="number"
+        name="aPlusB"
+        id="aPlusB"
+        value={aPlusB.value}
+      />
+    </>
+  );
 }
