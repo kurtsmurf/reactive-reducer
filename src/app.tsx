@@ -14,7 +14,7 @@ type Node =
     | { type: "value" }
     | { type: "addExpression"; addExpression: AddExpression }
   );
-type Graph = Record<Id, Node>;
+type Graph = Node[];
 type Event = { node: Id; newValue: number };
 
 // ********************************************************
@@ -22,7 +22,10 @@ type Event = { node: Id; newValue: number };
 // ********************************************************
 
 const reducer = (graph: Graph, event: Event): Graph => {
-  const target = graph[event.node];
+  const target = graph.find((node) => node.id === event.node);
+
+  if (!target) return graph;
+
   const consequentEvents: Event[] = target.dependents
     .map((dep) => ({
       type: "Update",
@@ -30,36 +33,59 @@ const reducer = (graph: Graph, event: Event): Graph => {
       newValue: event.newValue || 0,
     }));
 
-  const nextGraph = graph;
-
-  return consequentEvents.reduce(reducer, nextGraph);
+  switch (target.type) {
+    case "value": {
+      const updatedTarget = { ...target, value: event.newValue };
+      const nextGraph = graph.map((node) =>
+        node.id === event.node ? updatedTarget : node
+      );
+      return consequentEvents.reduce(reducer, nextGraph);
+    }
+    case "addExpression": {
+      const sum = (left: number, right: number) => left + right;
+      const isPart = (node: Node) =>
+        target.addExpression.parts.includes(node.id);
+      const nextValue = graph
+        .filter(isPart)
+        .map((node) => node.value)
+        .reduce(sum, 0);
+      const nextGraph = graph.map((node) =>
+        node.id === event.node ? { ...node, value: nextValue } : node
+      );
+      return consequentEvents.reduce(reducer, nextGraph);
+    }
+  }
 };
 
-const initialState: Graph = {
-  a: { id: "a", type: "value", value: 0, dependents: ["aPlusB"] },
-  b: { id: "b", type: "value", value: 0, dependents: ["aPlusB"] },
-  aPlusB: {
+const initialState: Graph = [
+  { id: "a", type: "value", value: 0, dependents: ["aPlusB"] },
+  { id: "b", type: "value", value: 0, dependents: ["aPlusB"] },
+  {
     id: "aPlusB",
     value: 0,
     type: "addExpression",
     addExpression: { parts: ["a", "b"] },
     dependents: [],
   },
-};
+];
 
 // ********************************************************
 // SECTION: TEST
 // ********************************************************
 
-const reducerTest = (message: string, given: { graph: Graph; event: Event }, expected: Graph) => {
+const reducerTest = (
+  message: string,
+  given: { graph: Graph; event: Event },
+  expected: Graph,
+) => {
   const actual: Graph = reducer(given.graph, given.event);
 
-  const stringify = (obj: object) => JSON.stringify(obj)
+  const stringify = (obj: object) => JSON.stringify(obj);
   const passed = deepequal(actual, expected);
 
   console.log(`
     ====
-    TEST: ${ passed ? "U PASS💃" : "U FAIL 😠"}
+    TEST: ${passed ? "U PASS 💃💃💃💃💃💃" : "U FAIL 😠"}
     ====
 
     ${message}
@@ -69,44 +95,44 @@ const reducerTest = (message: string, given: { graph: Graph; event: Event }, exp
 
     actual: ${stringify(actual)}
 
-  `)
+  `);
 };
 
 type TestCase = {
-  description: string,
+  description: string;
   graph: Graph;
   event: Event;
-  expected: Graph,
-}
+  expected: Graph;
+};
 
 const updatingValueNodeUpdatesItsValue: TestCase = {
   description: "Updating a value node updates its value",
-  graph: {
-    "a": {
+  graph: [
+    {
       "id": "a",
       "type": "value",
       "value": 0,
       "dependents": [],
-    }
-  },
+    },
+  ],
   event: {
     "node": "a",
     "newValue": 1,
-  }, 
-  expected: {
-    "a": {
+  },
+  expected: [
+    {
       "id": "a",
       "type": "value",
       "value": 1,
       "dependents": [],
     },
-  }
-}
+  ],
+};
 
 const updatingValueNodeUpdatesDependent: TestCase = {
   description: "Updating a value node updates its dependents",
-  graph: {
-    "a": {
+  graph: [
+    {
       "id": "a",
       "type": "value",
       "value": 0,
@@ -114,17 +140,17 @@ const updatingValueNodeUpdatesDependent: TestCase = {
         "aPlusB",
       ],
     },
-    "b": {
+    {
       "id": "b",
       "type": "value",
-      "value": 0,
+      "value": 1,
       "dependents": [
         "aPlusB",
       ],
     },
-    "aPlusB": {
+    {
       "id": "aPlusB",
-      "value": 0,
+      "value": 1,
       "type": "addExpression",
       "addExpression": {
         "parts": [
@@ -134,15 +160,15 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       },
       "dependents": [],
     },
-  },
-  
+  ],
+
   event: {
     "node": "a",
     "newValue": 1,
   },
-  
-  expected: {
-    "a": {
+
+  expected: [
+    {
       "id": "a",
       "type": "value",
       "value": 1,
@@ -150,17 +176,17 @@ const updatingValueNodeUpdatesDependent: TestCase = {
         "aPlusB",
       ],
     },
-    "b": {
+    {
       "id": "b",
       "type": "value",
-      "value": 0,
+      "value": 1,
       "dependents": [
         "aPlusB",
       ],
     },
-    "aPlusB": {
+    {
       "id": "aPlusB",
-      "value": 1,
+      "value": 2,
       "type": "addExpression",
       "addExpression": {
         "parts": [
@@ -170,17 +196,17 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       },
       "dependents": [],
     },
-  }
-}
+  ],
+};
 
 const testCases: TestCase[] = [
   updatingValueNodeUpdatesItsValue,
-  updatingValueNodeUpdatesDependent
-]
+  updatingValueNodeUpdatesDependent,
+];
 
 for (const testCase of testCases) {
   const { description, event, graph, expected } = testCase;
-  const given = { graph, event }
+  const given = { graph, event };
   reducerTest(description, given, expected);
 }
 
@@ -189,7 +215,6 @@ for (const testCase of testCases) {
 // ********************************************************
 
 export function App() {
-
   // const [state, dispatch] = useReducer(reducer, initialState);
 
   // return (
@@ -215,5 +240,5 @@ export function App() {
   //   </>
   // );
 
-  return <></>
+  return <></>;
 }
