@@ -3,28 +3,35 @@ import { useReducer } from "preact/hooks";
 import deepequal from "https://cdn.skypack.dev/deepequal";
 
 // ********************************************************
+// ********************************************************
 // SECTION: TYPES
+// ********************************************************
 // ********************************************************
 
 type Id = string;
-type AddExpression = { parts: Id[] };
 type Node =
   & { id: Id; value: number; dependents: Id[] }
   & (
     | { type: "value" }
-    | { type: "addExpression"; addExpression: AddExpression }
+    | { type: "addExpression"; parts: Id[] }
   );
 type Graph = Node[];
-type Event = { node: Id; newValue: number };
+type Event =
+  & { node: Id }
+  & (
+    | { type: "set"; newValue: number }
+    | { type: "evaluate" }
+  );
 
+// ********************************************************
 // ********************************************************
 // SECTION: LOGIC
 // ********************************************************
+// ********************************************************
 
-/**
- * Not built yet, but the idea is that the user will be able to update the graph by adding or removing nodes, and by writing formulas (for now just add expressions) that reference other nodes in the graph, creating dependent/dependency relationships between nodes. This web of dependent/dependency relationships will allow us to update the graph in a reactive way. When one node is updated, all of its dependents will be updated as well, and its dependents' dependents, and so on in a cascade.
+/* Not built yet, but the idea is that the user will be able to update the graph by adding or removing nodes, and by writing formulas (for now just add expressions) that reference other nodes in the graph, creating dependent/dependency relationships between nodes. This web of dependent/dependency relationships will allow us to update the graph in a reactive way. When one node is updated, all of its dependents will be updated as well, and its dependents' dependents, and so on in a cascade.
  *
- * Managing those relationships will be a little fiddly, since both the dependent and the dependency need to be aware of each other. In concrete terms, we need to add the dependent to the dependency's 'dependents' list, and we need to add the dependency to the consuming node's 'addExpression.parts' list whenever we create or update a formula.
+ * Managing those relationships will be a little fiddly, since both the dependent and the dependency need to be aware of each other. In concrete terms, we need to add the dependent to the dependency's 'dependents' list, and we need to add the dependency to the consuming node's 'addExpression.parts' list whenever we create or update a formula. When we remove a node, we also need to remove it from the dependent list of any dependencies it may have, and it should not be possible to remove a node if it has dependents.
  *
  * This will all be handled by the appropriate branch of the reducer - the consuming code (tests, ui) will only be aware of certain events that they can dispatch, e.g. UPDATE_VALUE, UPDATE_FORMULA etc.
  *
@@ -40,70 +47,53 @@ type Event = { node: Id; newValue: number };
  *
  * ...other requirements?
  * */
+const sum = (left: number, right: number) => left + right;
+const isPart = (parts: string[]) => (node: Node) => parts.includes(node.id);
+
 const reducer = (graph: Graph, event: Event): Graph => {
   const target = graph.find((node) => node.id === event.node);
 
   if (!target) return graph;
 
-  /**
-   * If I'm updating a dependent, it must be the case that it is an "addExpression" type node, since only expression types can depend on other nodes (rule is not implemented yet, but that's the plan). I'm providing a value to the newValue prop of the update event, but only because the types require it - the reducer will update the expression's value by re-evaluating the expression. This points to a potential improvement of the types - how do I make them better?
-   * */
-  const consequentEvents: Event[] = target.dependents
-    .map((dep) => ({
-      type: "Update",
-      node: dep,
-      newValue: event.newValue,
-    }));
+  const consequentEvents: Event[] = target.dependents.map((dep) => ({
+    type: "evaluate",
+    node: dep,
+  }));
 
-  switch (target.type) {
-    case "value": {
-      const updatedTarget = { ...target, value: event.newValue };
-      const nextGraph = graph.map((node) =>
-        node.id === event.node ? updatedTarget : node
-      );
-      return consequentEvents.reduce(reducer, nextGraph);
-    }
-    case "addExpression": {
-      const sum = (left: number, right: number) => left + right;
-      const isPart = (node: Node) =>
-        target.addExpression.parts.includes(node.id);
-      const nextValue = graph
-        .filter(isPart)
-        .map((node) => node.value)
-        .reduce(sum, 0);
-      const nextGraph = graph.map((node) =>
-        node.id === event.node ? { ...node, value: nextValue } : node
-      );
-      return consequentEvents.reduce(reducer, nextGraph);
-    }
+  if (event.type === "set" && target.type === "value") {
+    const updatedTarget = { ...target, value: event.newValue };
+    const nextGraph = graph.map((node) =>
+      node.id === event.node ? updatedTarget : node
+    );
+    return consequentEvents.reduce(reducer, nextGraph);
   }
+
+  if (event.type === "evaluate" && target.type === "addExpression") {
+    const updatedTarget = {
+      ...target,
+      value: graph
+        .filter(isPart(target.parts))
+        .map((node) => node.value)
+        .reduce(sum, 0),
+    };
+    const nextGraph = graph.map((node) =>
+      node.id === event.node ? updatedTarget : node
+    );
+    return consequentEvents.reduce(reducer, nextGraph);
+  }
+
+  return graph;
 };
 
+// ********************************************************
 // ********************************************************
 // SECTION: TEST
 // ********************************************************
+// ********************************************************
 
-const reducerTest = (
-  message: string,
-  given: { graph: Graph; event: Event },
-  expected: Graph,
-) => {
-  const actual: Graph = reducer(given.graph, given.event);
-  const passed = deepequal(actual, expected);
-
-  console.log(`
-    ====
-    TEST: ${passed ? "U PASS 💃💃💃💃💃💃" : "U FAIL 😠"}
-    ====
-
-    ${message}
-    result: ${passed}
-
-    expected: ${JSON.stringify(expected)}
-
-    actual: ${JSON.stringify(actual)}
-  `);
-};
+/* tests should guarantee the invariants listed above - may be a good opportunity to try out property-based testing with fast-check or similar
+ * https://www.skypack.dev/view/fast-check
+ */
 
 type TestCase = {
   description: string;
@@ -116,22 +106,23 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
   description: "Updating a value node updates its value",
   graph: [
     {
-      "id": "a",
-      "type": "value",
-      "value": 0,
-      "dependents": [],
+      id: "a",
+      type: "value",
+      value: 0,
+      dependents: [],
     },
   ],
   event: {
-    "node": "a",
-    "newValue": 1,
+    type: "set",
+    node: "a",
+    newValue: 1,
   },
   expected: [
     {
-      "id": "a",
-      "type": "value",
-      "value": 1,
-      "dependents": [],
+      id: "a",
+      type: "value",
+      value: 1,
+      dependents: [],
     },
   ],
 };
@@ -140,68 +131,37 @@ const updatingValueNodeUpdatesDependent: TestCase = {
   description: "Updating a value node updates its dependents",
   graph: [
     {
-      "id": "a",
-      "type": "value",
-      "value": 0,
-      "dependents": [
-        "aPlusB",
-      ],
+      id: "a",
+      type: "value",
+      value: 0,
+      dependents: ["b"],
     },
     {
-      "id": "b",
-      "type": "value",
-      "value": 1,
-      "dependents": [
-        "aPlusB",
-      ],
-    },
-    {
-      "id": "aPlusB",
-      "value": 1,
-      "type": "addExpression",
-      "addExpression": {
-        "parts": [
-          "a",
-          "b",
-        ],
-      },
-      "dependents": [],
+      id: "b",
+      value: 0,
+      type: "addExpression",
+      parts: ["a"],
+      dependents: [],
     },
   ],
-
   event: {
-    "node": "a",
-    "newValue": 1,
+    type: "set",
+    node: "a",
+    newValue: 1,
   },
-
   expected: [
     {
-      "id": "a",
-      "type": "value",
-      "value": 1,
-      "dependents": [
-        "aPlusB",
-      ],
+      id: "a",
+      type: "value",
+      value: 1,
+      dependents: ["b"],
     },
     {
-      "id": "b",
-      "type": "value",
-      "value": 1,
-      "dependents": [
-        "aPlusB",
-      ],
-    },
-    {
-      "id": "aPlusB",
-      "value": 2,
-      "type": "addExpression",
-      "addExpression": {
-        "parts": [
-          "a",
-          "b",
-        ],
-      },
-      "dependents": [],
+      id: "b",
+      value: 1,
+      type: "addExpression",
+      parts: ["a"],
+      dependents: [],
     },
   ],
 };
@@ -211,14 +171,31 @@ const testCases: TestCase[] = [
   updatingValueNodeUpdatesDependent,
 ];
 
-for (const testCase of testCases) {
+const reducerTest = (testCase: TestCase) => {
   const { description, event, graph, expected } = testCase;
-  const given = { graph, event };
-  reducerTest(description, given, expected);
-}
+  const actual = reducer(graph, event);
+  const passed = deepequal(actual, expected);
+
+  console.log(`
+    ====
+    TEST: ${passed ? "U PASS 💃💃💃💃💃💃" : "U FAIL 😠"}
+    ====
+
+    ${description}
+    result: ${passed}
+
+    expected: ${JSON.stringify(expected)}
+
+    actual: ${JSON.stringify(actual)}
+  `);
+};
+
+testCases.forEach(reducerTest);
 
 // ********************************************************
+// ********************************************************
 // SECTION: UI
+// ********************************************************
 // ********************************************************
 
 const initialState: Graph = [
@@ -228,7 +205,7 @@ const initialState: Graph = [
     id: "aPlusB",
     value: 0,
     type: "addExpression",
-    addExpression: { parts: ["a", "b"] },
+    parts: ["a", "b"],
     dependents: [],
   },
 ];
@@ -236,7 +213,7 @@ const initialState: Graph = [
 export function App() {
   const [state, dispatch] = useReducer(reducer, initialState);
 
-  // It would be nicer if I could get values without scanning the list, do a table lookup instead (object? hashMap? what data structure would be best for representing the graph?)
+  // It would be nicer (and probably faster) if I could get values without scanning the list, i.e. do a table lookup instead (object? hashMap? what data structure would be best for representing the graph?)
   const a = state.find((el) => el.id === "a");
   const b = state.find((el) => el.id === "b");
   const aPlusB = state.find((el) => el.id === "aPlusB");
@@ -253,6 +230,7 @@ export function App() {
         value={a.value}
         onInput={(event) =>
           dispatch({
+            type: "set",
             node: "a",
             newValue: parseInt(event.currentTarget.value),
           })}
@@ -266,6 +244,7 @@ export function App() {
         value={b.value}
         onInput={(event) =>
           dispatch({
+            type: "set",
             node: "b",
             newValue: parseInt(event.currentTarget.value),
           })}
