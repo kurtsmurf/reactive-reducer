@@ -19,9 +19,12 @@ type Graph = Node[];
 type Event =
   & { node: Id }
   & (
-    | { type: "set"; newValue: number }
+    | { type: "setValue"; newValue: number }
     | { type: "evaluate" }
   );
+type Get = (graph: Graph, id: Id) => Node | undefined;
+type Set = (graph: Graph, node: Node) => Graph;
+type Eval = (graph: Graph, node: Node & { type: "addExpression" }) => number;
 
 // ********************************************************
 // ********************************************************
@@ -47,11 +50,16 @@ type Event =
  *
  * ...other requirements?
  * */
-const sum = (left: number, right: number) => left + right;
-const isPart = (parts: string[]) => (node: Node) => parts.includes(node.id);
+const get: Get = (graph, id) => graph.find((node) => node.id === id);
+const set: Set = (graph, node) =>
+  graph.map((current) => current.id === node.id ? node : current);
+const evaluate: Eval = (graph, expression) => graph
+  .filter(node => expression.parts.includes(node.id))
+  .map((node) => node.value)
+  .reduce((left, right) => left + right, 0);
 
 const reducer = (graph: Graph, event: Event): Graph => {
-  const target = graph.find((node) => node.id === event.node);
+  const target = get(graph, event.node);
 
   if (!target) return graph;
 
@@ -60,25 +68,15 @@ const reducer = (graph: Graph, event: Event): Graph => {
     node: dep,
   }));
 
-  if (event.type === "set" && target.type === "value") {
+  if (event.type === "setValue" && target.type === "value") {
     const updatedTarget = { ...target, value: event.newValue };
-    const nextGraph = graph.map((node) =>
-      node.id === event.node ? updatedTarget : node
-    );
+    const nextGraph = set(graph, updatedTarget);
     return consequentEvents.reduce(reducer, nextGraph);
   }
 
   if (event.type === "evaluate" && target.type === "addExpression") {
-    const updatedTarget = {
-      ...target,
-      value: graph
-        .filter(isPart(target.parts))
-        .map((node) => node.value)
-        .reduce(sum, 0),
-    };
-    const nextGraph = graph.map((node) =>
-      node.id === event.node ? updatedTarget : node
-    );
+    const updatedTarget = { ...target, value: evaluate(graph, target) };
+    const nextGraph = set(graph, updatedTarget);
     return consequentEvents.reduce(reducer, nextGraph);
   }
 
@@ -113,7 +111,7 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
     },
   ],
   event: {
-    type: "set",
+    type: "setValue",
     node: "a",
     newValue: 1,
   },
@@ -145,7 +143,7 @@ const updatingValueNodeUpdatesDependent: TestCase = {
     },
   ],
   event: {
-    type: "set",
+    type: "setValue",
     node: "a",
     newValue: 1,
   },
@@ -211,12 +209,11 @@ const initialState: Graph = [
 ];
 
 export function App() {
-  const [state, dispatch] = useReducer(reducer, initialState);
+  const [graph, dispatch] = useReducer(reducer, initialState);
 
-  // It would be nicer (and probably faster) if I could get values without scanning the list, i.e. do a table lookup instead (object? hashMap? what data structure would be best for representing the graph?)
-  const a = state.find((el) => el.id === "a");
-  const b = state.find((el) => el.id === "b");
-  const aPlusB = state.find((el) => el.id === "aPlusB");
+  const a = get(graph, "a");
+  const b = get(graph, "b");
+  const aPlusB = get(graph, "aPlusB");
 
   if (!(a && b && aPlusB)) return <p>that ain't right</p>;
 
@@ -230,7 +227,7 @@ export function App() {
         value={a.value}
         onInput={(event) =>
           dispatch({
-            type: "set",
+            type: "setValue",
             node: "a",
             newValue: parseInt(event.currentTarget.value),
           })}
@@ -244,7 +241,7 @@ export function App() {
         value={b.value}
         onInput={(event) =>
           dispatch({
-            type: "set",
+            type: "setValue",
             node: "b",
             newValue: parseInt(event.currentTarget.value),
           })}
