@@ -32,6 +32,12 @@ type Evaluate = {
   id: Id;
 };
 
+type Add = {
+  type: "add";
+  node: Node;
+};
+
 export type Event =
+  | Add
   | Set
   | Evaluate;

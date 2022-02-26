@@ -74,9 +74,62 @@ const updatingValueNodeUpdatesDependent: TestCase = {
   ],
 };
 
+const addingNodeAddsNode: TestCase = {
+  description: "Add node event produces graph with node",
+  graph: [],
+  event: {
+    type: "add",
+    node: {
+      type: "value",
+      dependents: [],
+      id: "A1",
+      value: 0,
+    },
+  },
+  expected: [
+    {
+      type: "value",
+      dependents: [],
+      id: "A1",
+      value: 0,
+    },
+  ],
+};
+
+const cantAddDuplicateNode: TestCase = {
+  description: "Can't add a duplicate node",
+  graph: [
+    {
+      type: "value",
+      dependents: [],
+      id: "A1",
+      value: 0,
+    },
+  ],
+  event: {
+    type: "add",
+    node: {
+      type: "value",
+      dependents: [],
+      id: "A1",
+      value: 1,
+    },
+  },
+  expected: [
+    {
+      type: "value",
+      dependents: [],
+      id: "A1",
+      value: 0,
+    },
+  ],
+};
+
 const testCases: TestCase[] = [
   updatingValueNodeUpdatesItsValue,
   updatingValueNodeUpdatesDependent,
+  addingNodeAddsNode,
+  cantAddDuplicateNode,
 ];
 
 const reducerTest = ({ description, event, graph, expected }: TestCase) => {

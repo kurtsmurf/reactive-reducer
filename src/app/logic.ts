@@ -33,7 +33,31 @@ const evaluate = (graph: Graph, expression: Expression) =>
     .map((node) => node.value)
     .reduce((left, right) => left + right, 0);
 
+const hasDuplicates = (graph: Graph) =>
+  new Set(graph.map((node) => node.id)).size !== graph.length;
+
 export const reducer = (graph: Graph, event: Event): Graph => {
+  if (event.type === "add") {
+    const nextGraph = [...graph, event.node];
+
+    // Only return nextGraph if you can verify the following:
+
+    // 1. "every dependent is an expression"
+    // 2. "all relationships between nodes are known by both parties"
+    // (number 1 is covered by number 2)
+
+    // 3. "it has no cycles"
+
+    if (
+      // 4. "all ids are unique"
+      hasDuplicates(nextGraph)
+    ) {
+      return graph;
+    }
+
+    return nextGraph;
+  }
+
   const target = get(graph, event.id);
 
   if (!target) {
