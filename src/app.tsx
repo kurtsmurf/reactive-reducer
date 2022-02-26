@@ -188,8 +188,7 @@ const testCases: TestCase[] = [
   updatingValueNodeUpdatesDependent,
 ];
 
-const reducerTest = (testCase: TestCase) => {
-  const { description, event, graph, expected } = testCase;
+const reducerTest = ({ description, event, graph, expected }: TestCase) => {
   const actual = reducer(graph, event);
   const passed = deepequal(actual, expected);
 
@@ -227,53 +226,49 @@ const initialState: Graph = [
   },
 ];
 
+type Dispatch = (event: Event) => void;
+
+const ValueCell = ({ id, value }: Value, dispatch: Dispatch) => (
+  <>
+    <label htmlFor={id}>{id}</label>
+    <input
+      type="number"
+      name={id}
+      id={id}
+      value={value}
+      onInput={(event) =>
+        dispatch({
+          type: "set",
+          id,
+          value: parseInt(event.currentTarget.value),
+        })}
+    />
+  </>
+);
+
+const ExpressionCell = ({ id, value }: Expression, dispatch: Dispatch) => (
+  <>
+    <label htmlFor={id}>{id}</label>
+    <input
+      readOnly
+      type="number"
+      name={id}
+      id={id}
+      value={value}
+    />
+  </>
+);
+
+const Cell = (node: Node, dispatch: Dispatch) => {
+  switch (node.type) {
+    case "expression":
+      return ExpressionCell(node, dispatch);
+    case "value":
+      return ValueCell(node, dispatch);
+  }
+};
+
 export function App() {
   const [graph, dispatch] = useReducer(reducer, initialState);
-
-  const a = get(graph, "a");
-  const b = get(graph, "b");
-  const aPlusB = get(graph, "aPlusB");
-
-  if (!(a && b && aPlusB)) return <p>that ain't right</p>;
-
-  return (
-    <>
-      <label htmlFor="a">A</label>
-      <input
-        type="number"
-        name="a"
-        id="a"
-        value={a.value}
-        onInput={(event) =>
-          dispatch({
-            type: "set",
-            id: "a",
-            value: parseInt(event.currentTarget.value),
-          })}
-      />
-
-      <label htmlFor="b">B</label>
-      <input
-        type="number"
-        name="b"
-        id="b"
-        value={b.value}
-        onInput={(event) =>
-          dispatch({
-            type: "set",
-            id: "b",
-            value: parseInt(event.currentTarget.value),
-          })}
-      />
-
-      <label htmlFor="aPlusB">A + B</label>
-      <input
-        readOnly
-        type="number"
-        name="aPlusB"
-        id="aPlusB"
-        value={aPlusB.value}
-      />
-    </>
-  );
+  return graph.map((node) => Cell(node, dispatch));
 }
