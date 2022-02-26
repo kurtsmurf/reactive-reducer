@@ -1,4 +1,4 @@
-import { Graph, Id, Node, Expression, Event } from "./Id";
+import { Event, Expression, Graph, Id, Node } from "./types";
 
 /* Not built yet, but the idea is that the user will be able to update the graph by adding or removing nodes, and by writing formulas (for now just add expressions) that reference other nodes in the graph, creating dependent/dependency relationships between nodes. This web of dependent/dependency relationships will allow us to update the graph in a reactive way. When one node is updated, all of its dependents will be updated as well, and its dependents' dependents, and so on in a cascade.
  *
@@ -17,20 +17,28 @@ import { Graph, Id, Node, Expression, Event } from "./Id";
  * Number three says it must be impossible to loop back onto a node that was already visited in the current path, because doing so would cause the reducer to enter an infinite loop.
  *
  * ...other requirements?
- * */
-const get = (graph: Graph, id: Id) => graph
-  .find((node) => node.id === id);
-const set = (graph: Graph, node: Node) => graph
-  .map((current) => current.id === node.id ? node : current);
-const evaluate = (graph: Graph, expression: Expression) => graph
-  .filter((node) => expression.parts.includes(node.id))
-  .map((node) => node.value)
-  .reduce((left, right) => left + right, 0);
+ */
+
+const get = (graph: Graph, id: Id) =>
+  graph
+    .find((node) => node.id === id);
+
+const set = (graph: Graph, node: Node) =>
+  graph
+    .map((current) => current.id === node.id ? node : current);
+
+const evaluate = (graph: Graph, expression: Expression) =>
+  graph
+    .filter((node) => expression.dependencies.includes(node.id))
+    .map((node) => node.value)
+    .reduce((left, right) => left + right, 0);
+
 export const reducer = (graph: Graph, event: Event): Graph => {
   const target = get(graph, event.id);
 
-  if (!target)
+  if (!target) {
     return graph;
+  }
 
   const consequentEvents: Event[] = target.dependents.map((dep) => ({
     type: "evaluate",

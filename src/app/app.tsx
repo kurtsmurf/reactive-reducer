@@ -1,9 +1,9 @@
 import { useReducer } from "preact/hooks";
-import { Graph, Node, Expression, Event, Value } from "./Id";
-import { reducer } from "./get";
-import { runTests } from './TestCase'
+import { Event, Expression, Graph, Node, Value } from "./types";
+import { reducer } from "./logic";
+import { runTests } from "./tests";
 
-runTests()
+runTests();
 
 const initialState: Graph = [
   { id: "a", type: "value", value: 0, dependents: ["aPlusB"] },
@@ -12,7 +12,7 @@ const initialState: Graph = [
     id: "aPlusB",
     value: 0,
     type: "expression",
-    parts: ["a", "b"],
+    dependencies: ["a", "b"],
     dependents: [],
   },
 ];

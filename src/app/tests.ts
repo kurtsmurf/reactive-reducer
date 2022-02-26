@@ -1,7 +1,7 @@
 // @ts-ignore
 import deepequal from "https://cdn.skypack.dev/deepequal";
-import { Graph, Event } from "./Id";
-import { reducer } from "./get";
+import { Event, Graph } from "./types";
+import { reducer } from "./logic";
 
 type TestCase = {
   description: string;
@@ -9,6 +9,7 @@ type TestCase = {
   event: Event;
   expected: Graph;
 };
+
 const updatingValueNodeUpdatesItsValue: TestCase = {
   description: "Updating a value node updates its value",
   graph: [
@@ -33,6 +34,7 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
     },
   ],
 };
+
 const updatingValueNodeUpdatesDependent: TestCase = {
   description: "Updating a value node updates its dependents",
   graph: [
@@ -46,7 +48,7 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       id: "b",
       value: 0,
       type: "expression",
-      parts: ["a"],
+      dependencies: ["a"],
       dependents: [],
     },
   ],
@@ -66,15 +68,17 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       id: "b",
       value: 1,
       type: "expression",
-      parts: ["a"],
+      dependencies: ["a"],
       dependents: [],
     },
   ],
 };
+
 const testCases: TestCase[] = [
   updatingValueNodeUpdatesItsValue,
   updatingValueNodeUpdatesDependent,
 ];
+
 const reducerTest = ({ description, event, graph, expected }: TestCase) => {
   const actual = reducer(graph, event);
   const passed = deepequal(actual, expected);
