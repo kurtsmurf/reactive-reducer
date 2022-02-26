@@ -9,22 +9,36 @@ import deepequal from "https://cdn.skypack.dev/deepequal";
 // ********************************************************
 
 type Id = string;
+
+type Value = {
+  type: "value";
+  id: Id;
+  value: number;
+  dependents: Id[];
+};
+type Expression = {
+  type: "expression";
+  id: Id;
+  value: number;
+  dependents: Id[];
+  parts: Id[];
+};
 type Node =
-  & { id: Id; value: number; dependents: Id[] }
-  & (
-    | { type: "value" }
-    | { type: "addExpression"; parts: Id[] }
-  );
+  | Value
+  | Expression;
+
 type Graph = Node[];
+
 type Event =
-  & { node: Id }
-  & (
-    | { type: "setValue"; newValue: number }
-    | { type: "evaluate" }
-  );
-type Get = (graph: Graph, id: Id) => Node | undefined;
-type Set = (graph: Graph, node: Node) => Graph;
-type Eval = (graph: Graph, node: Node & { type: "addExpression" }) => number;
+  | {
+    type: "set";
+    id: Id;
+    value: number;
+  }
+  | {
+    type: "evaluate";
+    id: Id;
+  };
 
 // ********************************************************
 // ********************************************************
@@ -50,31 +64,36 @@ type Eval = (graph: Graph, node: Node & { type: "addExpression" }) => number;
  *
  * ...other requirements?
  * */
-const get: Get = (graph, id) => graph.find((node) => node.id === id);
-const set: Set = (graph, node) =>
-  graph.map((current) => current.id === node.id ? node : current);
-const evaluate: Eval = (graph, expression) => graph
-  .filter(node => expression.parts.includes(node.id))
-  .map((node) => node.value)
-  .reduce((left, right) => left + right, 0);
+const get = (graph: Graph, id: Id) =>
+  graph
+    .find((node) => node.id === id);
+const set = (graph: Graph, node: Node) =>
+  graph
+    .map((current) => current.id === node.id ? node : current);
+
+const evaluate = (graph: Graph, expression: Expression) =>
+  graph
+    .filter((node) => expression.parts.includes(node.id))
+    .map((node) => node.value)
+    .reduce((left, right) => left + right, 0);
 
 const reducer = (graph: Graph, event: Event): Graph => {
-  const target = get(graph, event.node);
+  const target = get(graph, event.id);
 
   if (!target) return graph;
 
   const consequentEvents: Event[] = target.dependents.map((dep) => ({
     type: "evaluate",
-    node: dep,
+    id: dep,
   }));
 
-  if (event.type === "setValue" && target.type === "value") {
-    const updatedTarget = { ...target, value: event.newValue };
+  if (event.type === "set" && target.type === "value") {
+    const updatedTarget = { ...target, value: event.value };
     const nextGraph = set(graph, updatedTarget);
     return consequentEvents.reduce(reducer, nextGraph);
   }
 
-  if (event.type === "evaluate" && target.type === "addExpression") {
+  if (event.type === "evaluate" && target.type === "expression") {
     const updatedTarget = { ...target, value: evaluate(graph, target) };
     const nextGraph = set(graph, updatedTarget);
     return consequentEvents.reduce(reducer, nextGraph);
@@ -111,9 +130,9 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
     },
   ],
   event: {
-    type: "setValue",
-    node: "a",
-    newValue: 1,
+    type: "set",
+    id: "a",
+    value: 1,
   },
   expected: [
     {
@@ -137,15 +156,15 @@ const updatingValueNodeUpdatesDependent: TestCase = {
     {
       id: "b",
       value: 0,
-      type: "addExpression",
+      type: "expression",
       parts: ["a"],
       dependents: [],
     },
   ],
   event: {
-    type: "setValue",
-    node: "a",
-    newValue: 1,
+    type: "set",
+    id: "a",
+    value: 1,
   },
   expected: [
     {
@@ -157,7 +176,7 @@ const updatingValueNodeUpdatesDependent: TestCase = {
     {
       id: "b",
       value: 1,
-      type: "addExpression",
+      type: "expression",
       parts: ["a"],
       dependents: [],
     },
@@ -202,7 +221,7 @@ const initialState: Graph = [
   {
     id: "aPlusB",
     value: 0,
-    type: "addExpression",
+    type: "expression",
     parts: ["a", "b"],
     dependents: [],
   },
@@ -227,9 +246,9 @@ export function App() {
         value={a.value}
         onInput={(event) =>
           dispatch({
-            type: "setValue",
-            node: "a",
-            newValue: parseInt(event.currentTarget.value),
+            type: "set",
+            id: "a",
+            value: parseInt(event.currentTarget.value),
           })}
       />
 
@@ -241,9 +260,9 @@ export function App() {
         value={b.value}
         onInput={(event) =>
           dispatch({
-            type: "setValue",
-            node: "b",
-            newValue: parseInt(event.currentTarget.value),
+            type: "set",
+            id: "b",
+            value: parseInt(event.currentTarget.value),
           })}
       />
 
