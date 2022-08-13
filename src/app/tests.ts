@@ -4,15 +4,15 @@ import { Event, Graph } from "./types";
 import { reducer } from "./logic";
 
 type TestCase = {
-  description: string;
-  graph: Graph;
-  event: Event;
-  expected: Graph;
+  title: string;
+  given: Graph;
+  when: Event;
+  expect: Graph;
 };
 
-const updatingValueNodeUpdatesItsValue: TestCase = {
-  description: "Updating a value node updates its value",
-  graph: [
+const testCases: TestCase[] = [{
+  title: "Updating a value node updates its value",
+  given: [
     {
       id: "a",
       type: "value",
@@ -20,12 +20,12 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
       dependents: [],
     },
   ],
-  event: {
+  when: {
     type: "set",
     id: "a",
     value: 1,
   },
-  expected: [
+  expect: [
     {
       id: "a",
       type: "value",
@@ -33,11 +33,9 @@ const updatingValueNodeUpdatesItsValue: TestCase = {
       dependents: [],
     },
   ],
-};
-
-const updatingValueNodeUpdatesDependent: TestCase = {
-  description: "Updating a value node updates its dependents",
-  graph: [
+}, {
+  title: "Updating a value node updates its dependents",
+  given: [
     {
       id: "a",
       type: "value",
@@ -52,12 +50,12 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       dependents: [],
     },
   ],
-  event: {
+  when: {
     type: "set",
     id: "a",
     value: 1,
   },
-  expected: [
+  expect: [
     {
       id: "a",
       type: "value",
@@ -72,12 +70,10 @@ const updatingValueNodeUpdatesDependent: TestCase = {
       dependents: [],
     },
   ],
-};
-
-const addingNodeAddsNode: TestCase = {
-  description: "Add node event produces graph with node",
-  graph: [],
-  event: {
+}, {
+  title: "Add node event produces graph with node",
+  given: [],
+  when: {
     type: "add",
     node: {
       type: "value",
@@ -86,7 +82,7 @@ const addingNodeAddsNode: TestCase = {
       value: 0,
     },
   },
-  expected: [
+  expect: [
     {
       type: "value",
       dependents: [],
@@ -94,11 +90,9 @@ const addingNodeAddsNode: TestCase = {
       value: 0,
     },
   ],
-};
-
-const cantAddDuplicateNode: TestCase = {
-  description: "Can't add a duplicate node",
-  graph: [
+}, {
+  title: "Can't add a duplicate node",
+  given: [
     {
       type: "value",
       dependents: [],
@@ -106,7 +100,7 @@ const cantAddDuplicateNode: TestCase = {
       value: 0,
     },
   ],
-  event: {
+  when: {
     type: "add",
     node: {
       type: "value",
@@ -115,7 +109,7 @@ const cantAddDuplicateNode: TestCase = {
       value: 1,
     },
   },
-  expected: [
+  expect: [
     {
       type: "value",
       dependents: [],
@@ -123,31 +117,19 @@ const cantAddDuplicateNode: TestCase = {
       value: 0,
     },
   ],
-};
+}];
 
-const testCases: TestCase[] = [
-  updatingValueNodeUpdatesItsValue,
-  updatingValueNodeUpdatesDependent,
-  addingNodeAddsNode,
-  cantAddDuplicateNode,
-];
+const reducerTest = ({ title, given, when, expect }: TestCase) => {
+  const actual = reducer(given, when);
+  const passed = deepequal(actual, expect);
 
-const reducerTest = ({ description, event, graph, expected }: TestCase) => {
-  const actual = reducer(graph, event);
-  const passed = deepequal(actual, expected);
-
-  console.log(`
-    ====
-    TEST: ${passed ? "U PASS 💃💃💃💃💃💃" : "U FAIL 😠"}
-    ====
-
-    ${description}
-    result: ${passed}
-
-    expected: ${JSON.stringify(expected)}
-
-    actual: ${JSON.stringify(actual)}
-  `);
+  if (passed) {
+    console.log(`✅ ${title}`)
+  } else {
+    console.log(`❌ ${title} 
+expect: ${JSON.stringify(expect)}
+actual: ${JSON.stringify(actual)}`)
+  }
 };
 
 export const runTests = () => testCases.forEach(reducerTest);

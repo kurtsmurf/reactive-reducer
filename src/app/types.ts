@@ -1,4 +1,8 @@
-export type Id = string;
+export type Graph = Node[];
+
+export type Node =
+  | Value
+  | Expression;
 
 export type Value = {
   type: "value";
@@ -15,11 +19,15 @@ export type Expression = {
   dependencies: Id[];
 };
 
-export type Node =
-  | Value
-  | Expression;
+export type Event =
+  | Add
+  | Set
+  | Evaluate;
 
-export type Graph = Node[];
+type Add = {
+  type: "add";
+  node: Node;
+};
 
 type Set = {
   type: "set";
@@ -32,12 +40,4 @@ type Evaluate = {
   id: Id;
 };
 
-type Add = {
-  type: "add";
-  node: Node;
-};
-
-export type Event =
-  | Add
-  | Set
-  | Evaluate;
+export type Id = string;
